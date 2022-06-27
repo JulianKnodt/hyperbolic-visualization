@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
@@ -17,6 +17,12 @@ impl<T> DAG<T> {
             edges: vec![],
         }
     }
+    pub fn num_nodes(&self) -> usize {
+        self.elements.len()
+    }
+    pub fn num_edges(&self) -> usize {
+        self.edges.iter().map(|e| e.len()).sum()
+    }
     pub fn insert(&mut self, v: T) -> DAGID {
         let idx = self.elements.len();
         self.elements.push(v);
@@ -32,7 +38,7 @@ impl<T> DAG<T> {
     pub fn get(&self, id: DAGID) -> &T {
         &self.elements[id]
     }
-    pub fn depth_first_iter<const order: TraversalOrder> (
+    pub fn depth_first_iter<const order: TraversalOrder>(
         &self,
         from: DAGID,
     ) -> DepthFirstIter<'_, T, order> {
@@ -41,6 +47,23 @@ impl<T> DAG<T> {
             parents: vec![(from, 0)],
             visited: HashSet::new(),
         }
+    }
+    pub fn from_pairs(pairs: impl IntoIterator<Item = (T, T)>) -> Self
+    where
+        T: Hash + Eq + Clone,
+    {
+        let mut seen = HashMap::new();
+        let mut out = Self::new();
+        for (src, dst) in pairs {
+            let src_id = *seen
+                .entry(src)
+                .or_insert_with_key(|src| out.insert(src.clone()));
+            let dst_id = *seen
+                .entry(dst)
+                .or_insert_with_key(|dst| out.insert(dst.clone()));
+            out.insert_edge(src_id, dst_id);
+        }
+        out
     }
 }
 
@@ -60,9 +83,11 @@ pub struct DepthFirstIter<'a, T, const order: TraversalOrder> {
 
 #[derive(Debug, Clone, Copy)]
 pub struct DFOut {
-    pub depth: usize,
-    pub child_num: usize,
     pub dagid: DAGID,
+
+    pub depth: usize,
+    /// Parent's DAGID, and index of this child is this
+    pub parent_ref: Option<(DAGID, usize)>,
 }
 
 impl<'a, T, const order: TraversalOrder> Iterator for DepthFirstIter<'a, T, order>
@@ -71,43 +96,82 @@ where
 {
     type Item = DFOut;
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let depth = self.parents.len();
+        while self.parents.len() > 0 {
+            let depth = self.parents.len() - 1;
+            let parent_ref: Option<(DAGID, usize)> = self
+                .parents
+                .len()
+                .checked_sub(2)
+                .and_then(|idx| self.parents.get(idx))
+                .map(|(parent, cn)| (*parent, *cn - 1));
+
             let (curr, child_num) = self.parents.last_mut()?;
             let dagid = *curr;
 
             match self.tree.neighbors(*curr).get(*child_num) {
-                Some(child_idx) => {
-                    let original_child_num = *child_num;
-                    *child_num += 1;
-                    if self.visited.insert(*child_idx) {
-                        self.parents.push((*child_idx, 0));
+                Some(child_id) => {
+                    let original_child_num = std::mem::replace(child_num, *child_num + 1);
+                    let unseen = self.visited.insert(*child_id);
+                    if unseen {
+                        self.parents.push((*child_id, 0));
                     }
-                    if order == TraversalOrder::PreOrder && original_child_num == 0 {
+                    if order == TraversalOrder::PreOrder && unseen && original_child_num == 0 {
                         return Some(DFOut {
                             depth,
-                            child_num: original_child_num,
+                            parent_ref,
                             dagid,
                         });
                     }
                 }
                 None => {
-                    assert!(self.parents.pop().is_some());
+                    let original_child_num = self.parents.pop().unwrap().1;
                     if order == TraversalOrder::PostOrder {
-                        let child_num = self
-                            .parents
-                            .last()
-                            .map(|(_, ci)| *ci)
-                            .unwrap_or(1)
-                            .saturating_sub(1);
                         return Some(DFOut {
-                            depth: self.parents.len(),
-                            child_num,
+                            depth,
+                            parent_ref,
+                            dagid,
+                        });
+                    } else if original_child_num == 0 {
+                        return Some(DFOut {
+                            depth,
+                            parent_ref,
                             dagid,
                         });
                     }
                 }
             }
         }
+        None
+    }
+}
+
+#[test]
+fn test_linked_list() {
+    let pairs = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6)];
+    let dag = DAG::from_pairs(pairs);
+    let iter = dag.depth_first_iter::<{ TraversalOrder::PreOrder }>(0);
+    for (i, v) in iter.enumerate() {
+        assert_eq!(i, v.depth);
+        assert_eq!(i, v.dagid);
+    }
+}
+
+#[test]
+fn test_simple_tree() {
+    let pairs = [(0, 1), (1, 2), (1, 3), (3, 4), (3, 5), (5, 6)];
+    let dag = DAG::from_pairs(pairs);
+    let iter = dag.depth_first_iter::<{ TraversalOrder::PreOrder }>(0);
+    for v in iter {
+        //println!("{:?}", v);
+    }
+}
+
+#[test]
+fn test_small_cycle() {
+    let pairs = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 0)];
+    let dag = DAG::from_pairs(pairs);
+    let iter = dag.depth_first_iter::<{ TraversalOrder::PreOrder }>(0);
+    for v in iter {
+        //println!("{:?}", v);
     }
 }
