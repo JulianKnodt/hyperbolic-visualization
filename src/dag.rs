@@ -48,6 +48,34 @@ impl<T> DAG<T> {
             visited: HashSet::new(),
         }
     }
+    pub fn depth_first_visit(&self, from: DAGID, mut f: impl FnMut(DFOut)) {
+        let mut work = vec![DFOut {
+            dagid: from,
+            depth: 0,
+            parent_ref: None,
+        }];
+        let mut seen = HashSet::new();
+
+        while let Some(node) = work.pop() {
+            let unseen = seen.insert(node.dagid);
+            if !unseen {
+                continue;
+            }
+            work.extend(
+                self.neighbors(node.dagid)
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &dagid)| DFOut {
+                        dagid,
+                        depth: node.depth + 1,
+                        parent_ref: Some((node.dagid, i)),
+                    })
+                    .rev(),
+            );
+            f(node);
+        }
+    }
+
     pub fn from_pairs(pairs: impl IntoIterator<Item = (T, T)>) -> Self
     where
         T: Hash + Eq + Clone,
@@ -81,7 +109,7 @@ pub struct DepthFirstIter<'a, T, const order: TraversalOrder> {
     visited: HashSet<DAGID>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct DFOut {
     pub dagid: DAGID,
 
