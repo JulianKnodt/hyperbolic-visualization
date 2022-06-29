@@ -71,7 +71,7 @@ impl<const N: usize> PoincarePoint<N> {
         (1.0 + 2. * k).acosh()
     }
 
-    pub(crate) fn is_valid(&self) -> bool {
+    pub fn is_valid(&self) -> bool {
         norm(&self.0) <= 1.
     }
     pub const fn zero() -> Self {

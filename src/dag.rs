@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
@@ -40,9 +40,16 @@ impl<T> DAG<T> {
         self.edges[from].push(to);
         self.back_edges[to].push(from);
     }
+    /// All vertices `v` such that `of` -> `v`.
     pub fn neighbors(&self, of: DAGID) -> &[DAGID] {
         &self.edges[of]
     }
+    /// All vertices `v` such that `v` -> `to`.
+    pub fn incoming(&self, to: DAGID) -> &[DAGID] {
+        &self.back_edges[to]
+    }
+
+    /// returns data for an ID.
     pub fn get(&self, id: DAGID) -> &T {
         &self.elements[id]
     }
@@ -65,8 +72,7 @@ impl<T> DAG<T> {
         let mut seen = HashSet::new();
 
         while let Some(node) = work.pop() {
-            let unseen = seen.insert(node.dagid);
-            if !unseen {
+            if !seen.insert(node.dagid) {
                 continue;
             }
             let children = self
@@ -80,6 +86,43 @@ impl<T> DAG<T> {
                 })
                 .rev();
             work.extend(children);
+            f(node);
+        }
+    }
+
+    pub fn breadth_first_visit(&self, from: DAGID, mut f: impl FnMut(DFOut)) {
+        let mut work = VecDeque::new();
+        work.push_back(DFOut {
+            dagid: from,
+            depth: 0,
+            parent_ref: None,
+        });
+        let mut seen = HashSet::new();
+
+        while let Some(node) = work.pop_front() {
+            if !seen.insert(node.dagid) {
+                continue;
+            }
+            let children = self
+                .neighbors(node.dagid)
+                .iter()
+                .enumerate()
+                .map(|(i, &dagid)| DFOut {
+                    dagid,
+                    depth: node.depth + 1,
+                    parent_ref: Some((node.dagid, i)),
+                });
+            let parents = self
+                .incoming(node.dagid)
+                .iter()
+                .enumerate()
+                .map(|(i, &dagid)| DFOut {
+                    dagid,
+                    depth: node.depth + 1,
+                    parent_ref: Some((node.dagid, i)),
+                });
+            work.extend(children);
+            work.extend(parents);
             f(node);
         }
     }
@@ -117,13 +160,26 @@ pub struct DepthFirstIter<'a, T, const order: TraversalOrder> {
     visited: HashSet<DAGID>,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DFOut {
     pub dagid: DAGID,
 
+    /// Depth relative to a root, can be negative for parents of the root.
     pub depth: usize,
     /// Parent's DAGID, and index of this child is this
     pub parent_ref: Option<(DAGID, usize)>,
+}
+
+impl PartialOrd for DFOut {
+    fn partial_cmp(&self, o: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(o))
+    }
+}
+
+impl Ord for DFOut {
+    fn cmp(&self, o: &Self) -> std::cmp::Ordering {
+        self.depth.cmp(&o.depth)
+    }
 }
 
 impl<'a, T, const order: TraversalOrder> Iterator for DepthFirstIter<'a, T, order>
@@ -197,8 +253,7 @@ fn test_simple_tree() {
     let pairs = [(0, 1), (1, 2), (1, 3), (3, 4), (3, 5), (5, 6)];
     let dag = DAG::from_pairs(pairs);
     let iter = dag.depth_first_iter::<{ TraversalOrder::PreOrder }>(0);
-    for _v in iter {
-    }
+    for _v in iter {}
 }
 
 #[test]
@@ -206,6 +261,5 @@ fn test_small_cycle() {
     let pairs = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 0)];
     let dag = DAG::from_pairs(pairs);
     let iter = dag.depth_first_iter::<{ TraversalOrder::PreOrder }>(0);
-    for _v in iter {
-    }
+    for _v in iter {}
 }

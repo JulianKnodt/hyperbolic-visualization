@@ -6,11 +6,12 @@
 use std::hash::Hash;
 
 pub mod dag;
-pub use dag::{TraversalOrder, DAG, DAGID};
+pub use dag::{DFOut, TraversalOrder, DAG, DAGID};
 
 pub mod map;
 pub mod poincare_ball;
 
+// TODO feature gate this under wasm
 pub mod wasm;
 
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
@@ -29,14 +30,17 @@ impl AngleRange {
 }
 
 /// Projects a tree into hyperbolic space, returning the set of coordinates at which each point
-/// is mapped to.
-pub fn hyperbolic_project<T>(dag: &DAG<T>, focus: DAGID) -> Vec<[f64; 2]>
+/// is mapped to, as well as the connectivity.
+pub fn hyperbolic_project<T>(
+    dag: &DAG<T>,
+    focus: DAGID,
+) -> (Vec<[f64; 2]>, impl Iterator<Item = DFOut>)
 where
     T: Hash + Eq,
 {
     let mut info: Vec<_> = vec![Default::default(); dag.num_nodes()];
     let mut order = vec![];
-    dag.depth_first_visit(focus, |dfout| {
+    dag.breadth_first_visit(focus, |dfout| {
         info[dfout.dagid] = dfout;
         order.push(dfout.dagid);
     });
@@ -83,7 +87,7 @@ where
         let (sin, cos) = angle.to_radians().sin_cos();
         final_locations[v.dagid] = [radius * cos, radius * sin];
     }
-    final_locations
+    (final_locations, order.into_iter().map(move |o| info[o]))
 }
 
 #[test]

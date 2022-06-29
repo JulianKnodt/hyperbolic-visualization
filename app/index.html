@@ -37,21 +37,21 @@
           const coords = dag.coordinates(props.focus);
           ctx.clearRect(0,0,800,800);
           let [xs,ys] = unzip(coords);
-          if (props.mapping !== null && props.mapping !== "null") {
-            console.log(props.mapping);
+          if (props.mapping !== "none") {
             const mapped = hyperbol.Maps.circle_to_square(xs, ys, props.mapping);
             [xs, ys] = unzip(mapped);
           }
           for (let i in xs) {
             ctx.fillRect(200 + 200 * xs[i], 200 + 200 * ys[i], 4, 4);
           }
+          // TODO render arcs
         };
 
         const gui = new dat.GUI();
         const props = {focus: 0, mapping: null};
         const controllers = [
           gui.add(props, "focus", 0, 10_000, 1),
-          gui.add(props, "mapping", [null, "simple", "elliptical", "squircular"]),
+          gui.add(props, "mapping", ["none", "simple", "elliptical", "squircular"]),
         ];
         for (let c of controllers) c.onChange(_ => render(props));
       };

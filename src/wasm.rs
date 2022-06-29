@@ -1,10 +1,12 @@
-use super::dag::DAG;
+use super::dag::{DFOut, DAG};
 use super::map::{self, Mapping};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub struct DAGVisualizer {
     dag: DAG<u32>,
+
+    info: Vec<DFOut>,
 }
 
 #[wasm_bindgen]
@@ -13,12 +15,23 @@ impl DAGVisualizer {
     pub fn new(src: &[u32], dst: &[u32]) -> DAGVisualizer {
         let data = src.iter().cloned().zip(dst.iter().cloned());
         let dag = DAG::from_pairs(data);
-        Self { dag }
+        Self { dag, info: vec![] }
     }
 
-    pub fn coordinates(&self, focus: usize) -> Vec<f64> {
-        let coords = super::hyperbolic_project(&self.dag, focus);
+    /// Returns a flattened vector of Vec<[f64;2]> coordinates of tree elements
+    pub fn coordinates(&mut self, focus: usize) -> Vec<f64> {
+        let (coords, info) = super::hyperbolic_project(&self.dag, focus);
+        self.info = info.collect();
         coords.into_iter().flatten().collect()
+    }
+
+    /// Returns a flattened vector of `parent` -> `child` connections.
+    pub fn connectivity(&self) -> Vec<usize> {
+        self.info
+            .iter()
+            .filter_map(|dfout| dfout.parent_ref.map(|(p, _)| [p, dfout.dagid]))
+            .flatten()
+            .collect()
     }
 }
 

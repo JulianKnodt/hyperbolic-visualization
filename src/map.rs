@@ -100,9 +100,13 @@ impl_mapping!(
       let v2 = v*v;
       let sum = u2+v2;
       let sign_uv = u.signum() * v.signum();
+
       let k = sign_uv * (sum - (sum * (sum - 4. * u2 * v2)).sqrt()).sqrt();
       let safe_div = |a,b| if b == 0. { 0. } else { a / b };
-      [safe_div(k, (2. * v2).sqrt()), safe_div(k, (2. * u2).sqrt())]
+      [
+        safe_div(k, (2. * v2).sqrt().copysign(v)),
+        safe_div(k, (2. * u2).sqrt().copysign(u)),
+      ]
     },
   }
 );
