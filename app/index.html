@@ -3,6 +3,7 @@
     <meta content="text/html;charset=utf-8" http-equiv="Content-Type"/>
   </head>
   <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js" integrity="sha512-WoO4Ih0CDOSLYafy22wZD/mcJ7k0ESLqtQsFa6zFKnEUrbtuGU+GkLtVhgt93xa2qewG5gKEC6CWlN8OaCTSVg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <!-- Note the usage of `type=module` here as this is an ES6 module -->
     <script type="module">
       // Use ES module import syntax to import functionality from the module
@@ -14,24 +15,53 @@
       // eventually the manual initialization won't be required!
       import init, * as hyperbol from '../pkg/hyperbol.js';
 
-      async function run() {
-        const f = await fetch("./cit-DBLP.edges")
-          .then(resp => resp.text());
+      const unzip = zipped => [
+        zipped.filter((_, i) => i % 2 == 0),
+        zipped.filter((_, i) => i % 2 == 1),
+      ];
+      const zip = (l, r) => l.map((v, i) => [v, r[i]]).flatten();
+
+      const run = async () => {
+        await init();
+        const f = await fetch("./cit-DBLP.edges").then(resp => resp.text());
         const data = f.split("\n").map(v => v.split(" "));
 
         const src = data.map(v => parseInt(v[0]));
         const dst = data.map(v => parseInt(v[1]));
-
-        await init();
-
         const dag = new hyperbol.DAGVisualizer(src, dst);
-        console.log(dag.coordinates());
-      }
+
+        const canvas = document.getElementById("vis");
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = 'rgb(0,0,200)';
+        const render = async (props) => {
+          const coords = dag.coordinates(props.focus);
+          ctx.clearRect(0,0,800,800);
+          let [xs,ys] = unzip(coords);
+          if (props.mapping !== null && props.mapping !== "null") {
+            console.log(props.mapping);
+            const mapped = hyperbol.Maps.circle_to_square(xs, ys, props.mapping);
+            [xs, ys] = unzip(mapped);
+          }
+          for (let i in xs) {
+            ctx.fillRect(200 + 200 * xs[i], 200 + 200 * ys[i], 4, 4);
+          }
+        };
+
+        const gui = new dat.GUI();
+        const props = {focus: 0, mapping: null};
+        const controllers = [
+          gui.add(props, "focus", 0, 10_000, 1),
+          gui.add(props, "mapping", [null, "simple", "elliptical", "squircular"]),
+        ];
+        for (let c of controllers) c.onChange(_ => render(props));
+      };
 
       run();
+
+
     </script>
-    <canvas>
-    </canvas>
+
+    <canvas id="vis" width="800px" height="800px"></canvas>
   </body>
 </html>
 

@@ -1,3 +1,5 @@
+// Functions which map coordinates on a disk to a square and vice-versa
+//
 // Implemented based off of
 // Analytical Methods for Squaring the Disc:
 // https://arxiv.org/pdf/1509.06344.pdf
@@ -46,12 +48,17 @@ impl_mapping!(
       let u2 = u*u;
       let v2 = v*v;
       let k = (u2+v2).sqrt();
+      let safe_div = |a,b| if b == 0. {
+        0.
+      } else {
+        a/b
+      };
       if u2 >= v2 {
         let us = u.signum();
-        [us * k, us * (v/u) * k]
+        [us * k, us * safe_div(v, u) * k]
       } else {
         let vs = v.signum();
-        [vs * (u/v) * k, vs * k]
+        [vs * safe_div(u, v) * k, vs * k]
       }
     },
   }
@@ -66,8 +73,8 @@ impl_mapping!(
     |u,v| {
       let u2 = u*u;
       let v2 = v*v;
-      let u2rt2 = (u2 * 8.).sqrt();
-      let v2rt2 = (v2 * 8.).sqrt();
+      let u2rt2 = (u2 * 8.).sqrt().copysign(u);
+      let v2rt2 = (v2 * 8.).sqrt().copysign(v);
       [
         0.5 * ((2.+u2-v2+u2rt2).sqrt()-(2.+u2-v2-u2rt2).sqrt()),
         0.5 * ((2.-u2+v2+v2rt2).sqrt()-(2.-u2+v2-v2rt2).sqrt()),
@@ -77,10 +84,10 @@ impl_mapping!(
 );
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct FGSquircularMapping;
+pub struct FGSquircular;
 
 impl_mapping!(
-  impl Mapping<f32, f64> for FGSquircularMapping {
+  impl Mapping<f32, f64> for FGSquircular {
     |x,y| {
       let x2 = x * x;
       let y2 = y * y;
@@ -94,7 +101,8 @@ impl_mapping!(
       let sum = u2+v2;
       let sign_uv = u.signum() * v.signum();
       let k = sign_uv * (sum - (sum * (sum - 4. * u2 * v2)).sqrt()).sqrt();
-      [k/(2. * v2).sqrt(), k/(2. * u2).sqrt()]
+      let safe_div = |a,b| if b == 0. { 0. } else { a / b };
+      [safe_div(k, (2. * v2).sqrt()), safe_div(k, (2. * u2).sqrt())]
     },
   }
 );

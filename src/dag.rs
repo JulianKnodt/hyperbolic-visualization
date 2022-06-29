@@ -4,7 +4,10 @@ use std::hash::Hash;
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct DAG<T> {
     elements: Vec<T>,
+    /// Outgoing edges
     edges: Vec<Vec<DAGID>>,
+    /// Backwards edges, does not exist but refers to the edge inverse.
+    back_edges: Vec<Vec<DAGID>>,
 }
 
 /// Alias for usize for an item inserted into a tree.
@@ -14,7 +17,9 @@ impl<T> DAG<T> {
     pub fn new() -> Self {
         Self {
             elements: vec![],
+
             edges: vec![],
+            back_edges: vec![],
         }
     }
     pub fn num_nodes(&self) -> usize {
@@ -27,10 +32,13 @@ impl<T> DAG<T> {
         let idx = self.elements.len();
         self.elements.push(v);
         self.edges.push(Vec::new());
+        self.back_edges.push(Vec::new());
+
         idx
     }
     pub fn insert_edge(&mut self, from: DAGID, to: DAGID) {
         self.edges[from].push(to);
+        self.back_edges[to].push(from);
     }
     pub fn neighbors(&self, of: DAGID) -> &[DAGID] {
         &self.edges[of]
@@ -61,17 +69,17 @@ impl<T> DAG<T> {
             if !unseen {
                 continue;
             }
-            work.extend(
-                self.neighbors(node.dagid)
-                    .iter()
-                    .enumerate()
-                    .map(|(i, &dagid)| DFOut {
-                        dagid,
-                        depth: node.depth + 1,
-                        parent_ref: Some((node.dagid, i)),
-                    })
-                    .rev(),
-            );
+            let children = self
+                .neighbors(node.dagid)
+                .iter()
+                .enumerate()
+                .map(|(i, &dagid)| DFOut {
+                    dagid,
+                    depth: node.depth + 1,
+                    parent_ref: Some((node.dagid, i)),
+                })
+                .rev();
+            work.extend(children);
             f(node);
         }
     }
@@ -189,8 +197,7 @@ fn test_simple_tree() {
     let pairs = [(0, 1), (1, 2), (1, 3), (3, 4), (3, 5), (5, 6)];
     let dag = DAG::from_pairs(pairs);
     let iter = dag.depth_first_iter::<{ TraversalOrder::PreOrder }>(0);
-    for v in iter {
-        //println!("{:?}", v);
+    for _v in iter {
     }
 }
 
@@ -199,7 +206,6 @@ fn test_small_cycle() {
     let pairs = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 0)];
     let dag = DAG::from_pairs(pairs);
     let iter = dag.depth_first_iter::<{ TraversalOrder::PreOrder }>(0);
-    for v in iter {
-        //println!("{:?}", v);
+    for _v in iter {
     }
 }

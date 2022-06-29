@@ -8,7 +8,7 @@ use std::hash::Hash;
 pub mod dag;
 pub use dag::{TraversalOrder, DAG, DAGID};
 
-pub mod circle_to_square;
+pub mod map;
 pub mod poincare_ball;
 
 pub mod wasm;
