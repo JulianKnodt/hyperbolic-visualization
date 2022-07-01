@@ -33,10 +33,19 @@
         const canvas = document.getElementById("vis");
         const ctx = canvas.getContext("2d");
         ctx.fillStyle = 'rgb(0,0,200)';
+
+        const get_coords = props => { props.coords = dag.coordinates(props.focus); };
+
         const render = async (props) => {
-          const coords = dag.coordinates(props.focus);
+          if (props.coords == undefined) get_coords(props);
+
           ctx.clearRect(0,0,800,800);
-          let [xs,ys] = unzip(coords);
+          let [xs,ys] = unzip(props.coords);
+          // shift items before mapping to stay in sphere
+          if ([0,0] != props.shift) {
+            let [dx, dy] = props.shift;
+            [xs,ys] = unzip(hyperbol.Maps.shift(props.coords, dx, dy));
+          }
           if (props.mapping !== "none") {
             const mapped = hyperbol.Maps.circle_to_square(xs, ys, props.mapping);
             [xs, ys] = unzip(mapped);
@@ -46,14 +55,27 @@
           }
           // TODO render arcs
         };
+        const shift_items = async (props, dx, dy) => {
+          props.shift[0] += dx;
+          props.shift[1] += dy;
+        };
 
         const gui = new dat.GUI();
-        const props = {focus: 0, mapping: null};
-        const controllers = [
-          gui.add(props, "focus", 0, 10_000, 1),
-          gui.add(props, "mapping", ["none", "simple", "elliptical", "squircular"]),
-        ];
-        for (let c of controllers) c.onChange(_ => render(props));
+        const props = {focus: 0, mapping: "none", shift: [0,0]};
+        gui.add(props, "focus", 0, 10_000, 1).onChange(_ => {
+          props.shift = [0,0],
+          get_coords(props);
+          render(props);
+        });
+        gui.add(props, "mapping", ["none", "simple", "elliptical", "squircular"])
+          .onChange(_ => render(props));
+        window.onkeydown = e => {
+          if (e.code == "ArrowRight") shift_items(props, 0.05, 0);
+          if (e.code ==  "ArrowLeft") shift_items(props, -0.05, 0);
+          if (e.code == "ArrowUp") shift_items(props, 0, 0.05);
+          if (e.code ==  "ArrowDown") shift_items(props, 0, -0.05);
+          render(props)
+        };
       };
 
       run();

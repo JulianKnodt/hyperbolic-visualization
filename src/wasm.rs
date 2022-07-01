@@ -1,5 +1,6 @@
 use super::dag::{DFOut, DAG};
 use super::map::{self, Mapping};
+use super::poincare_ball::PoincarePoint;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -52,6 +53,19 @@ impl Maps {
         us.iter()
             .zip(vs.iter())
             .map(|(&u, &v)| mapping([u, v]))
+            .flatten()
+            .collect()
+    }
+
+    // #[wasm_bindgen]
+    pub fn shift(uvs: &[f32], x: f32, y: f32) -> Vec<f32> {
+        let shift = PoincarePoint::exp(&[x, y]);
+        uvs.array_chunks::<2>()
+            .map(|pt| PoincarePoint::from_raw(pt).mobius_add(&shift))
+            .map(|pt| {
+                let &[u, v] = pt.as_slice();
+                [u, v]
+            })
             .flatten()
             .collect()
     }

@@ -1,5 +1,5 @@
 #![allow(incomplete_features)]
-#![feature(adt_const_params)]
+#![feature(adt_const_params, array_chunks)]
 // Ignore non upper globals.
 #![allow(non_upper_case_globals)]
 
@@ -66,7 +66,8 @@ where
         );
 
         let child_num = child_num as f64;
-        let total_segments = dag.neighbors(parent).len();
+        let total_segments = 1+dag.neighbors(parent).len();
+        assert_ne!(total_segments, 0);
         let segment_size = parent_range.size / (total_segments as f64);
 
         let start = parent_range.start + segment_size * child_num;
@@ -94,7 +95,7 @@ where
 fn test_simple_tree() {
     let graph = [(0, 1), (0, 2), (0, 3), (1, 4), (1, 5), (5, 6), (5, 7)];
     let dag = DAG::from_pairs(graph);
-    let points = hyperbolic_project(&dag, 0);
+    let points = hyperbolic_project(&dag, 0).0;
     for [x, y] in &points {
         println!("{:.2?}", (x, y));
     }

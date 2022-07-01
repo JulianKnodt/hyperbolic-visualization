@@ -1,49 +1,55 @@
 use std::array;
 
+type FP = f32;
 #[derive(Debug, PartialEq, PartialOrd, Copy, Clone)]
-pub struct PoincarePoint<const N: usize = 2>([f64; N]);
+pub struct PoincarePoint<const N: usize = 2>([FP; N]);
 
 /// Computes the norm of a vector.
-fn sqr_norm(v: &[f64]) -> f64 {
-    v.iter().map(|v| v * v).sum::<f64>()
+fn sqr_norm(v: &[FP]) -> FP {
+    v.iter().map(|v| v * v).sum::<FP>()
 }
 
-fn norm(v: &[f64]) -> f64 {
+fn norm(v: &[FP]) -> FP {
     sqr_norm(v).sqrt()
 }
 
-fn inner_prod<const N: usize>(l: &[f64; N], r: &[f64; N]) -> f64 {
+fn inner_prod<const N: usize>(l: &[FP; N], r: &[FP; N]) -> FP {
     l.iter().zip(r.iter()).map(|(a, b)| a * b).sum()
 }
 
-fn kmul<const N: usize>(k: f64, v: &[f64; N]) -> [f64; N] {
+fn kmul<const N: usize>(k: FP, v: &[FP; N]) -> [FP; N] {
     v.map(|v| k * v)
 }
-fn kdiv<const N: usize>(v: &[f64; N], k: f64) -> [f64; N] {
+fn kdiv<const N: usize>(v: &[FP; N], k: FP) -> [FP; N] {
     v.map(|v| v / k)
 }
 
 impl<const N: usize> PoincarePoint<N> {
-    pub fn from_raw(v: &[f64; N]) -> Self {
+    pub fn from_raw(v: &[FP; N]) -> Self {
+        /*
         assert!(
             norm(v.as_slice()) <= 1.0,
             "Cannot convert points outside of Poincare ball (||v|| > 1)"
         );
+        */
         Self(v.clone())
     }
+    pub fn as_slice(&self) -> &[FP; N] {
+        &self.0
+    }
     /// Convert points from euclidean space into a point on the Poincare Ball.
-    pub fn exp(v: &[f64; N]) -> Self {
-        let v_norm = norm(v);
+    pub fn exp(v: &[FP; N]) -> Self {
+        let v_norm = norm(v) + 1e-5;
         let k = v_norm.tanh() / v_norm;
         Self(v.map(|v| v * k))
     }
-    pub fn log(&self) -> [f64; N] {
+    pub fn log(&self) -> [FP; N] {
         let norm = norm(&self.0);
         let k = norm.atanh() / norm;
         self.0.map(|v| v * k)
     }
 
-    pub fn left_k_mobius_mul(&self, k: f64) -> Self {
+    pub fn left_k_mobius_mul(&self, k: FP) -> Self {
         Self::exp(&self.log().map(|v| k * v))
     }
 
@@ -64,7 +70,7 @@ impl<const N: usize> PoincarePoint<N> {
     pub fn neg(&self) -> Self {
         Self(self.0.map(|v| -v))
     }
-    pub fn dist(&self, o: &Self) -> f64 {
+    pub fn dist(&self, o: &Self) -> FP {
         let x_norm = sqr_norm(&self.0);
         let y_norm = sqr_norm(&o.0);
         let k = sqr_norm(&sub(&self.0, &o.0)) / ((1.0 - x_norm) * (1.0 - y_norm));
@@ -81,7 +87,7 @@ impl<const N: usize> PoincarePoint<N> {
 
 macro_rules! create_elemwise_fn {
   ($name: ident, $op: tt) => {
-    pub fn $name<const N: usize>(l: &[f64; N], r: &[f64; N]) -> [f64; N] {
+    pub fn $name<const N: usize>(l: &[FP; N], r: &[FP; N]) -> [FP; N] {
       array::from_fn(|i| l[i] $op r[i])
     }
   }
