@@ -41,7 +41,6 @@ pub struct Maps;
 
 #[wasm_bindgen]
 impl Maps {
-    #[wasm_bindgen]
     pub fn circle_to_square(us: &[f32], vs: &[f32], method: &str) -> Vec<f32> {
         assert_eq!(us.len(), vs.len(), "Length mismatch in us and vs");
         let mapping: Box<dyn Fn([f32; 2]) -> [f32; 2]> = match method {
@@ -57,11 +56,12 @@ impl Maps {
             .collect()
     }
 
-    // #[wasm_bindgen]
-    pub fn shift(uvs: &[f32], x: f32, y: f32) -> Vec<f32> {
+    pub fn shift(uvs: &[f32], x: f32, y: f32, r: f32) -> Vec<f32> {
         let shift = PoincarePoint::exp(&[x, y]);
         uvs.array_chunks::<2>()
-            .map(|pt| PoincarePoint::from_raw(pt).mobius_add(&shift))
+            .map(|pt| PoincarePoint::from_raw(pt))
+            .map(|pt| pt.mobius_add(&shift))
+            .map(|pt| pt.rotate(r.to_radians()))
             .map(|pt| {
                 let &[u, v] = pt.as_slice();
                 [u, v]

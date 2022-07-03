@@ -85,6 +85,22 @@ impl<const N: usize> PoincarePoint<N> {
     }
 }
 
+impl PoincarePoint<2> {
+    /// Perform rotation in poincare ball
+    pub fn mobius_rotate(&self, theta: FP) -> Self {
+        let [u, v] = self.0;
+        let sinh = theta.sinh();
+        let cosh = theta.cosh();
+        Self([cosh * u + sinh * v, -sinh * u + cosh * v])
+    }
+    /// Perform euclidean rotation of entire poincare ball
+    pub fn rotate(&self, theta: FP) -> Self {
+        let [u, v] = self.0;
+        let (sin, cos) = theta.sin_cos();
+        Self([cos * u + sin * v, - sin * u + cos * v])
+    }
+}
+
 macro_rules! create_elemwise_fn {
   ($name: ident, $op: tt) => {
     pub fn $name<const N: usize>(l: &[FP; N], r: &[FP; N]) -> [FP; N] {

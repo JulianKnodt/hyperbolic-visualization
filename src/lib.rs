@@ -66,7 +66,7 @@ where
         );
 
         let child_num = child_num as f64;
-        let total_segments = 1+dag.neighbors(parent).len();
+        let total_segments = 1 + dag.neighbors(parent).len();
         assert_ne!(total_segments, 0);
         let segment_size = parent_range.size / (total_segments as f64);
 

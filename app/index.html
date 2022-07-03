@@ -44,7 +44,7 @@
           // shift items before mapping to stay in sphere
           if ([0,0] != props.shift) {
             let [dx, dy] = props.shift;
-            [xs,ys] = unzip(hyperbol.Maps.shift(props.coords, dx, dy));
+            [xs,ys] = unzip(hyperbol.Maps.shift(props.coords, dx, dy, props.rotation));
           }
           if (props.mapping !== "none") {
             const mapped = hyperbol.Maps.circle_to_square(xs, ys, props.mapping);
@@ -61,7 +61,12 @@
         };
 
         const gui = new dat.GUI();
-        const props = {focus: 0, mapping: "none", shift: [0,0]};
+        const props = {
+          focus: 0,
+          mapping: "none",
+          shift: [0,0],
+          rotation: 0,
+        };
         gui.add(props, "focus", 0, 10_000, 1).onChange(_ => {
           props.shift = [0,0],
           get_coords(props);
@@ -69,6 +74,8 @@
         });
         gui.add(props, "mapping", ["none", "simple", "elliptical", "squircular"])
           .onChange(_ => render(props));
+        gui.add(props, "rotation", 0, 360).onChange(_ => render(props));
+
         window.onkeydown = e => {
           if (e.code == "ArrowRight") shift_items(props, 0.05, 0);
           if (e.code ==  "ArrowLeft") shift_items(props, -0.05, 0);
