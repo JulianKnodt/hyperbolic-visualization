@@ -14,3 +14,6 @@ trees](https://en.wikipedia.org/wiki/Hyperbolic_tree), where hyperbolic refers t
 in hyperbolic space. This has the effect of having a strong fisheye effect around the origin, so
 things at infinity are visible on the corner of the visualization.
 
+# TODOs
+
+- Create a file explorer with a TUI

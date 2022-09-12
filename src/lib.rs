@@ -10,16 +10,19 @@ pub use dag::{DFOut, TraversalOrder, DAG, DAGID};
 
 pub mod map;
 pub mod poincare_ball;
+pub use poincare_ball::PoincarePoint;
 
 // TODO feature gate this under wasm
 pub mod wasm;
 
+pub type FP = f64;
+
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
 pub struct AngleRange {
     /// Starting degree of angle range
-    start: f64,
+    start: FP,
     /// Number of degrees in angle range
-    size: f64,
+    size: FP,
 }
 
 impl AngleRange {
@@ -34,7 +37,7 @@ impl AngleRange {
 pub fn hyperbolic_project<T>(
     dag: &DAG<T>,
     focus: DAGID,
-) -> (Vec<[f64; 2]>, impl Iterator<Item = DFOut>)
+) -> (Vec<[FP; 2]>, impl Iterator<Item = DFOut>)
 where
     T: Hash + Eq,
 {
@@ -46,6 +49,7 @@ where
     });
 
     let mut angles = vec![AngleRange::default(); dag.num_nodes()];
+    let mut max_depth = 0;
 
     for &o in &order {
         let v = &info[o];
@@ -65,13 +69,14 @@ where
             v,
         );
 
-        let child_num = child_num as f64;
+        let child_num = child_num as FP;
         let total_segments = 1 + dag.neighbors(parent).len();
         assert_ne!(total_segments, 0);
-        let segment_size = parent_range.size / (total_segments as f64);
+        let segment_size = parent_range.size / (total_segments as FP);
 
         let start = parent_range.start + segment_size * child_num;
         let size = segment_size;
+        max_depth = max_depth.max(v.depth);
         angles[v.dagid] = AngleRange { start, size };
     }
 
@@ -83,7 +88,7 @@ where
             // root is at center.
             continue;
         }
-        let radius = 1.0 - (0.5f64).powi(depth as i32);
+        let radius = 0.98 * (depth as FP / max_depth as FP);
         let angle = angles[v.dagid].start + (angles[v.dagid].size / 2.0);
         let (sin, cos) = angle.to_radians().sin_cos();
         final_locations[v.dagid] = [radius * cos, radius * sin];

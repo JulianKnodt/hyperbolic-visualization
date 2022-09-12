@@ -1,8 +1,8 @@
 use std::array;
 
-type FP = f32;
+type FP = f64;
 #[derive(Debug, PartialEq, PartialOrd, Copy, Clone)]
-pub struct PoincarePoint<const N: usize = 2>([FP; N]);
+pub struct PoincarePoint<const N: usize = 2>(pub [FP; N]);
 
 /// Computes the norm of a vector.
 fn sqr_norm(v: &[FP]) -> FP {
@@ -97,7 +97,7 @@ impl PoincarePoint<2> {
     pub fn rotate(&self, theta: FP) -> Self {
         let [u, v] = self.0;
         let (sin, cos) = theta.sin_cos();
-        Self([cos * u + sin * v, - sin * u + cos * v])
+        Self([cos * u + sin * v, -sin * u + cos * v])
     }
 }
 
