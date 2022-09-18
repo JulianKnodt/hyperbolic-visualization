@@ -1,3 +1,5 @@
+#![feature(let_else)]
+#![feature(absolute_path)]
 #[allow(unused)]
 use clap::Parser;
 use crossterm::{
@@ -7,7 +9,8 @@ use crossterm::{
 };
 use hyperbol::{hyperbolic_project, PoincarePoint, DAG, DAGID};
 use std::collections::HashMap;
-use std::fs::metadata;
+use std::fs::{canonicalize, metadata};
+use std::path::{absolute, Path, MAIN_SEPARATOR};
 use std::{io, time::Duration};
 use tui::{
     backend::{Backend, CrosstermBackend},
@@ -42,6 +45,24 @@ struct App {
     buffer: String,
 }
 
+fn canonical(s: &str) -> Result<String, ()> {
+    let abs = absolute(s)
+        .map_err(|_| ())?
+        .into_os_string()
+        .into_string()
+        .unwrap();
+    let canon = canonicalize(abs)
+        .map_err(|_| ())?
+        .into_os_string()
+        .into_string()
+        .unwrap();
+    Ok(canon)
+}
+
+fn is_dir(s: &str) -> bool {
+    Path::new(s).is_dir()
+}
+
 impl App {
     pub fn new(root: &str, max_depth: usize) -> Self {
         let mut dag = DAG::new();
@@ -63,15 +84,28 @@ impl App {
 
         let (path_positions, _) = hyperbolic_project(&dag, 0);
 
+        let mut buffer = canonical(root).unwrap();
+
+        if !buffer.ends_with(MAIN_SEPARATOR) && is_dir(&buffer) {
+            buffer.push(MAIN_SEPARATOR)
+        }
+
         Self {
             shift: [0.; 2],
             id_to_path,
             path_positions,
-            buffer: String::from(""),
+            buffer,
         }
     }
+
     pub fn reset_root(&mut self) -> bool {
-        let root = &self.buffer;
+        while self.buffer.ends_with(MAIN_SEPARATOR) && self.buffer.len() > 1 {
+            self.buffer.pop();
+        }
+
+        let Ok(root) = absolute(&self.buffer) else {
+            return false
+        };
         let mut dag = DAG::new();
         let iter = WalkDir::new(root).min_depth(0).max_depth(3);
         let iter = iter.into_iter().filter_map(|v| v.ok());
@@ -82,8 +116,10 @@ impl App {
             let insert_id = dag.insert(path.clone());
             if entry.depth() > 0 {
                 let parent_path = entry.path().parent().unwrap().to_str().unwrap().to_string();
-                let parent_id = path_to_id[&parent_path];
-                dag.insert_edge(parent_id, insert_id);
+                let Some(parent_id) = path_to_id.get(&parent_path) else {
+                  continue
+                };
+                dag.insert_edge(*parent_id, insert_id);
             }
             assert_eq!(id_to_path.insert(insert_id, path.clone()), None);
             assert_eq!(path_to_id.insert(path, insert_id), None);
@@ -111,7 +147,7 @@ fn main() -> Result<(), io::Error> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let res = run_app(&mut terminal, App::new(&args.root, 3));
+    run_app(&mut terminal, App::new(&args.root, 3))?;
 
     // restore terminal
     disable_raw_mode()?;
@@ -149,8 +185,18 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                         app.buffer.pop();
                     }
                     KeyCode::Enter => {
-                        // TODO decide on strategy for clearing path
+                        if app.buffer == "" {
+                            continue;
+                        }
                         app.reset_root();
+                        app.buffer = if let Ok(canon) = canonical(&app.buffer) {
+                            canon
+                        } else {
+                            String::from("ERROR")
+                        };
+                        if is_dir(&app.buffer) && !app.buffer.ends_with(MAIN_SEPARATOR) {
+                            app.buffer.push(MAIN_SEPARATOR);
+                        }
                     }
                     KeyCode::Char(c) => {
                         app.buffer.push(c);
@@ -180,7 +226,9 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
 
                 let x = new_p.0[0];
                 let y = new_p.0[1];
-                let path = app.id_to_path[&i].clone();
+                let Some(path) = app.id_to_path.get(&i).clone() else {
+                    continue
+                };
                 let color = if let Ok(md) = metadata(&path) {
                     if md.file_type().is_file() {
                         Color::Green
@@ -192,7 +240,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
                 } else {
                     Color::Magenta
                 };
-                let display = std::path::Path::new(&path).to_path_buf();
+                let display = Path::new(&path).to_path_buf();
                 let display: String = if let Some(file_name) = display.file_name() {
                     file_name.to_str().unwrap().to_string()
                 } else {
@@ -211,10 +259,11 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
             Style::default().add_modifier(Modifier::BOLD),
         ))
     };
-    let paragraph = Paragraph::new(app.buffer.clone())
+    let display_text = format!("Curr Directory {}", app.buffer);
+    let entry = Paragraph::new(app.buffer.clone())
         //.style(Style::default().bg(Color::White).fg(Color::Black))
-        .block(create_block("Refocus on directory:"))
-        .alignment(Alignment::Center)
+        .block(create_block(&display_text))
+        .alignment(Alignment::Left)
         .wrap(Wrap { trim: true });
-    f.render_widget(paragraph, chunks[1]);
+    f.render_widget(entry, chunks[1]);
 }
